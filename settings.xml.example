@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copy to ~/.m2/settings.xml (or merge the <server> entry) so Maven can download
+  com.snowresorts:security-lib (and contracts) from GitHub Packages.
+
+  Token: GitHub Personal Access Token (classic) with the `read:packages` scope.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <servers>
+    <server>
+      <id>github</id>
+      <username>yurileao</username>
+      <password>${env.GITHUB_TOKEN}</password>
+    </server>
+  </servers>
+</settings>

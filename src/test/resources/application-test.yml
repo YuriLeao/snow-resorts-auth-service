@@ -1,0 +1,8 @@
+# Integration tests: no SMTP; profile bootstrap uses a closed port (failures are tolerated).
+spring:
+  mail:
+    host:
+
+snow:
+  auth:
+    user-service-url: http://127.0.0.1:1

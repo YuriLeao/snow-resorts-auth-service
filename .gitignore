@@ -1,0 +1,21 @@
+target/
+*.class
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/.gradle-enterprise/
+.mvn/.develocity/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+
+# Local secrets / env
+*.env
+settings.xml
+pom.xml.versionsBackup

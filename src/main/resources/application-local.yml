@@ -1,0 +1,14 @@
+# Local dev profile ($0). Connects to the Docker Compose Postgres started by `make dev`.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/snow_resorts?currentSchema=auth
+    username: snow
+    password: snow
+  mail:
+    host: localhost
+    port: 1025
+    username: noreply@snow-resorts.local
+
+logging:
+  level:
+    com.snowresorts.auth: DEBUG
