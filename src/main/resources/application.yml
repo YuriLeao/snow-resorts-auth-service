@@ -46,7 +46,8 @@ snow:
     refresh-token-ttl: 30d
     password-reset-ttl: 1h
     key-id: snow-auth-key
-    # Frontend or deep-link page that collects the new password and POSTs to /auth/reset-password.
+    # Base URL for the reset link in e-mails. Local: http://localhost:8080/reset-password (nginx → app deep link).
+    # Override via PASSWORD_RESET_BASE_URL (e.g. http://<LAN_IP>:8080/reset-password on a physical phone).
     password-reset-base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:8080/reset-password}
     user-service-url: ${USER_SERVICE_URL:http://localhost:8082}
     internal-api-secret: ${INTERNAL_API_SECRET:dev-internal-secret}

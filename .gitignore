@@ -17,5 +17,6 @@ target/
 
 # Local secrets / env
 *.env
+.env.local
 settings.xml
 pom.xml.versionsBackup
