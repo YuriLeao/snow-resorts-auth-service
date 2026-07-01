@@ -2,9 +2,9 @@ name: auth-service CI/CD
 
 on:
   push:
-    branches: [main, staging]
+    branches: [master, staging]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -49,10 +49,10 @@ jobs:
 
   deploy:
     needs: build-test
-    # Deploy only on pushes to staging/main (staging -> staging env, main -> prod env).
+    # Deploy only on pushes to staging/master (staging -> staging env, master -> prod env).
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+    environment: ${{ github.ref_name == 'master' && 'prod' || 'staging' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -91,5 +91,5 @@ jobs:
       # Rolling update of just this service's ECS task definition.
       - name: Force ECS deployment
         run: |
-          CLUSTER="snow-resorts-${{ github.ref_name == 'main' && 'prod' || 'staging' }}"
+          CLUSTER="snow-resorts-${{ github.ref_name == 'master' && 'prod' || 'staging' }}"
           aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE_NAME" --force-new-deployment
