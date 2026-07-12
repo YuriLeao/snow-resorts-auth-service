@@ -57,16 +57,18 @@ public class AuthenticationService {
      * @throws ConflictException if an account with the same (normalized) email already exists
      */
     @Transactional
-    public TokenPair register(String email, String rawPassword) {
+    public TokenPair register(String email, String rawPassword, String username, String displayName) {
         String normalizedEmail = normalize(email);
         if (userAccounts.findByEmail(normalizedEmail).isPresent()) {
             throw new ConflictException("An account with this email already exists.");
         }
 
+        profileBootstrap.ensureUsernameAvailable(username);
+
         String passwordHash = passwordEncoder.encode(rawPassword);
         UserAccount account = userAccounts.create(normalizedEmail, passwordHash, true);
         log.info("Registered new account {}", account.id());
-        profileBootstrap.bootstrapProfile(account.id(), account.email());
+        profileBootstrap.bootstrapProfile(account.id(), account.email(), username, displayName.trim());
         return issueTokens(account);
     }
 

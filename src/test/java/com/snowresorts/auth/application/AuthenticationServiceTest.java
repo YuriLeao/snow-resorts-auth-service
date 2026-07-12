@@ -99,15 +99,31 @@ class AuthenticationServiceTest {
         when(accessTokenIssuer.issue(created)).thenReturn(new IssuedAccessToken("access.jwt", 900));
 
         // Act
-        TokenPair pair = service.register("  NewRider@Snow-Resorts.com  ", "Password123!");
+        TokenPair pair = service.register("  NewRider@Snow-Resorts.com  ", "Password123!", "newrider", "New Rider");
 
         // Assert
         assertThat(pair.accessToken()).isEqualTo("access.jwt");
         assertThat(pair.tokenType()).isEqualTo("Bearer");
         assertThat(pair.refreshToken()).isNotBlank();
+        verify(profileBootstrap).ensureUsernameAvailable("newrider");
         verify(userAccounts).create("newrider@snow-resorts.com", "encoded-hash", true);
-        verify(profileBootstrap).bootstrapProfile(USER_ID, "newrider@snow-resorts.com");
+        verify(profileBootstrap).bootstrapProfile(USER_ID, "newrider@snow-resorts.com", "newrider", "New Rider");
         verify(refreshTokens).save(eq(USER_ID), any(), any(Instant.class));
+    }
+
+    @Test
+    @DisplayName("register with a taken username returns 409 and never creates an account")
+    void register_withTakenUsername_throwsConflict() {
+        when(userAccounts.findByEmail("newrider@snow-resorts.com")).thenReturn(Optional.empty());
+        org.mockito.Mockito.doThrow(new ConflictException("That username is already taken."))
+                .when(profileBootstrap).ensureUsernameAvailable("taken");
+
+        assertThatThrownBy(() -> service.register("newrider@snow-resorts.com", "Password123!", "taken", "Rider"))
+                .isInstanceOf(ConflictException.class);
+
+        verify(userAccounts, never()).create(any(), any(), anyBoolean());
+        verify(profileBootstrap, never()).bootstrapProfile(any(), any(), any(), any());
+        verify(refreshTokens, never()).save(any(), any(), any());
     }
 
     @Test
@@ -115,11 +131,12 @@ class AuthenticationServiceTest {
     void register_withDuplicateEmail_throwsConflict() {
         when(userAccounts.findByEmail("demo@snow-resorts.com")).thenReturn(Optional.of(enabledAccount()));
 
-        assertThatThrownBy(() -> service.register("Demo@Snow-Resorts.com", "Password123!"))
+        assertThatThrownBy(() -> service.register("Demo@Snow-Resorts.com", "Password123!", "demo", "Demo"))
                 .isInstanceOf(ConflictException.class);
 
         verify(userAccounts, never()).create(any(), any(), anyBoolean());
-        verify(profileBootstrap, never()).bootstrapProfile(any(), any());
+        verify(profileBootstrap, never()).ensureUsernameAvailable(any());
+        verify(profileBootstrap, never()).bootstrapProfile(any(), any(), any(), any());
         verify(refreshTokens, never()).save(any(), any(), any());
     }
 
