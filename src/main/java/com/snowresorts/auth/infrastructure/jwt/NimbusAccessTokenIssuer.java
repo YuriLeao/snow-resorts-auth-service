@@ -40,7 +40,6 @@ public class NimbusAccessTokenIssuer implements AccessTokenIssuer {
                 .expiresAt(now.plusSeconds(ttlSeconds))
                 .subject(account.id().toString())
                 .id(UUID.randomUUID().toString())
-                .claim("email", account.email())
                 .claim("roles", List.of("USER"))
                 .build();
 

@@ -6,6 +6,7 @@ import com.snowresorts.auth.domain.port.PasswordResetTokens;
 import com.snowresorts.auth.domain.port.RefreshTokens;
 import com.snowresorts.auth.domain.port.UserAccounts;
 import com.snowresorts.security.error.BadRequestException;
+import com.snowresorts.security.jwt.AccessTokenRevocationStore;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -29,20 +30,25 @@ public class PasswordResetService {
     private final PasswordResetNotifier notifier;
     private final RefreshTokens refreshTokens;
     private final PasswordEncoder passwordEncoder;
+    private final AccessTokenRevocationStore accessTokenRevocationStore;
     private final Duration passwordResetTtl;
+    private final Duration accessTokenTtl;
 
     public PasswordResetService(UserAccounts userAccounts,
                                 PasswordResetTokens passwordResetTokens,
                                 PasswordResetNotifier notifier,
                                 RefreshTokens refreshTokens,
                                 PasswordEncoder passwordEncoder,
+                                AccessTokenRevocationStore accessTokenRevocationStore,
                                 AuthTokenProperties properties) {
         this.userAccounts = userAccounts;
         this.passwordResetTokens = passwordResetTokens;
         this.notifier = notifier;
         this.refreshTokens = refreshTokens;
         this.passwordEncoder = passwordEncoder;
+        this.accessTokenRevocationStore = accessTokenRevocationStore;
         this.passwordResetTtl = properties.passwordResetTtl();
+        this.accessTokenTtl = properties.accessTokenTtl();
     }
 
     /**
@@ -63,7 +69,7 @@ public class PasswordResetService {
 
     /**
      * Consumes a reset token: validates it, sets the new (hashed) password, marks the token used
-     * and revokes every active refresh token so existing sessions cannot survive a credential reset.
+     * and revokes every active session so existing tokens cannot survive a credential reset.
      *
      * @throws BadRequestException if the token is unknown, already used or expired
      */
@@ -73,9 +79,11 @@ public class PasswordResetService {
                 .filter(t -> t.isUsable(Instant.now()))
                 .orElseThrow(() -> new BadRequestException("Invalid or expired password reset token."));
 
+        Instant now = Instant.now();
         userAccounts.updatePassword(token.userId(), passwordEncoder.encode(newPassword));
         passwordResetTokens.markUsed(token.id());
         refreshTokens.revokeAllForUser(token.userId());
+        accessTokenRevocationStore.revokeAllIssuedAtOrBefore(token.userId(), now, accessTokenTtl);
         log.info("Password reset completed for account {}; all sessions revoked", token.userId());
     }
 

@@ -37,7 +37,8 @@ class SmtpPasswordResetNotifierTest {
                 Duration.ofHours(1),
                 "http://localhost:8080/reset-password",
                 "http://localhost:8082",
-                "dev-internal-secret");
+                "dev-internal-secret",
+                null);
         notifier = new SmtpPasswordResetNotifier(mailSender, properties, "noreply@snow-resorts.local");
     }
 
@@ -64,7 +65,8 @@ class SmtpPasswordResetNotifierTest {
         String htmlText = extractPartContent(message, "text/html");
         assertThat(plainText).isNotNull().contains(resetUrl);
         assertThat(htmlText).isNotNull()
-                .contains("<a href=\"" + resetUrl + "\">Reset your password</a>")
+                .contains("href=\"" + resetUrl + "\"")
+                .contains("Reset your password")
                 .contains("font-family: -apple-system")
                 .contains("cid:appIcon");
     }
@@ -80,7 +82,8 @@ class SmtpPasswordResetNotifierTest {
                 Duration.ofHours(1),
                 "http://app/reset?lang=en",
                 "http://localhost:8082",
-                "dev-internal-secret");
+                "dev-internal-secret",
+                null);
         SmtpPasswordResetNotifier customNotifier =
                 new SmtpPasswordResetNotifier(mailSender, properties, "noreply@snow-resorts.local");
 

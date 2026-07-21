@@ -52,7 +52,8 @@ class RestProfileBootstrapClientTest {
                 Duration.ofHours(1),
                 null,
                 "http://localhost:8082",
-                "test-secret");
+                "test-secret",
+                null);
         client = new RestProfileBootstrapClient(restClient, properties);
     }
 

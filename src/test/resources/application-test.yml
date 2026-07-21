@@ -1,7 +1,12 @@
 # Integration tests: no SMTP; profile bootstrap uses a closed port (failures are tolerated).
+# Redis is excluded so Testcontainers runs without a Redis container (in-memory revocation store).
 spring:
   mail:
     host:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 
 snow:
   auth:

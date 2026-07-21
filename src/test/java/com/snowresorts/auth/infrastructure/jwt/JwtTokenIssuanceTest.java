@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -34,8 +35,10 @@ class JwtTokenIssuanceTest {
     void setUp() {
         properties = new AuthTokenProperties("https://auth.test",
                 Duration.ofMinutes(15), Duration.ofDays(30), "test-key", Duration.ofHours(1),
-                null, null, null);
-        keyProvider = new RsaKeyProvider(properties);
+                null, null, null, null);
+        MockEnvironment env = new MockEnvironment();
+        env.setActiveProfiles("test");
+        keyProvider = new RsaKeyProvider(properties, env);
         JWKSource<SecurityContext> jwkSource = new ImmutableJWKSet<>(new JWKSet(keyProvider.signingKey()));
         issuer = new NimbusAccessTokenIssuer(new NimbusJwtEncoder(jwkSource), keyProvider, properties);
     }
@@ -60,7 +63,7 @@ class JwtTokenIssuanceTest {
         assertThat(token.expiresInSeconds()).isEqualTo(900);
         assertThat(decoded.getSubject()).isEqualTo(USER_ID.toString());
         assertThat(decoded.getIssuer()).hasToString("https://auth.test");
-        assertThat(decoded.<String>getClaim("email")).isEqualTo("demo@snow-resorts.com");
+        assertThat(decoded.hasClaim("email")).isFalse();
         assertThat((List<String>) decoded.getClaim("roles")).contains("USER");
         assertThat(decoded.getExpiresAt()).isNotNull();
     }

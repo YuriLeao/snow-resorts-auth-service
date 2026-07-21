@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,6 +20,7 @@ import com.snowresorts.auth.domain.port.RefreshTokens;
 import com.snowresorts.auth.domain.port.UserAccounts;
 import com.snowresorts.security.error.ConflictException;
 import com.snowresorts.security.error.UnauthorizedException;
+import com.snowresorts.security.jwt.AccessTokenRevocationStore;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -47,6 +49,10 @@ class AuthenticationServiceTest {
     private ProfileBootstrap profileBootstrap;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private AccessTokenRevocationStore accessTokenRevocationStore;
+    @Mock
+    private AuthRateLimiter rateLimiter;
 
     private AuthenticationService service;
 
@@ -54,9 +60,11 @@ class AuthenticationServiceTest {
     void setUp() {
         AuthTokenProperties props = new AuthTokenProperties(
                 "https://auth.test", Duration.ofMinutes(15), Duration.ofDays(30), "k1", Duration.ofHours(1),
-                null, null, null);
+                null, null, null, null);
+        lenient().when(passwordEncoder.encode(any())).thenReturn("dummy-hash");
+        lenient().when(rateLimiter.tryConsumeAccount(any())).thenReturn(true);
         service = new AuthenticationService(userAccounts, refreshTokens, accessTokenIssuer,
-                profileBootstrap, passwordEncoder, props);
+                profileBootstrap, passwordEncoder, accessTokenRevocationStore, rateLimiter, props);
     }
 
     private UserAccount enabledAccount() {
@@ -119,7 +127,8 @@ class AuthenticationServiceTest {
                 .when(profileBootstrap).ensureUsernameAvailable("taken");
 
         assertThatThrownBy(() -> service.register("newrider@snow-resorts.com", "Password123!", "taken", "Rider"))
-                .isInstanceOf(ConflictException.class);
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Registration could not be completed.");
 
         verify(userAccounts, never()).create(any(), any(), anyBoolean());
         verify(profileBootstrap, never()).bootstrapProfile(any(), any(), any(), any());
@@ -132,7 +141,8 @@ class AuthenticationServiceTest {
         when(userAccounts.findByEmail("demo@snow-resorts.com")).thenReturn(Optional.of(enabledAccount()));
 
         assertThatThrownBy(() -> service.register("Demo@Snow-Resorts.com", "Password123!", "demo", "Demo"))
-                .isInstanceOf(ConflictException.class);
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Registration could not be completed.");
 
         verify(userAccounts, never()).create(any(), any(), anyBoolean());
         verify(profileBootstrap, never()).ensureUsernameAvailable(any());
@@ -171,7 +181,7 @@ class AuthenticationServiceTest {
 
         assertThatThrownBy(() -> service.login("demo@snow-resorts.com", "Password123!"))
                 .isInstanceOf(UnauthorizedException.class)
-                .hasMessage("Account is disabled.");
+                .hasMessage("Invalid email or password.");
     }
 
     @Test
@@ -237,7 +247,7 @@ class AuthenticationServiceTest {
     }
 
     @Test
-    @DisplayName("logout revokes the presented refresh token")
+    @DisplayName("logout revokes the refresh family and denylists access tokens")
     void logout_revokesPresentedToken() {
         String rawToken = "to-logout";
         String hash = RefreshTokenCodec.hash(rawToken);
@@ -246,8 +256,24 @@ class AuthenticationServiceTest {
                 Instant.now().plus(Duration.ofDays(1)), false, Instant.now());
         when(refreshTokens.findByTokenHash(hash)).thenReturn(Optional.of(token));
 
-        service.logout(rawToken);
+        service.logout(rawToken, "jti-123", USER_ID);
 
-        verify(refreshTokens).revoke(tokenId);
+        verify(refreshTokens).revokeAllForUser(USER_ID);
+        verify(accessTokenRevocationStore).revokeAllIssuedAtOrBefore(
+                eq(USER_ID), any(Instant.class), eq(Duration.ofMinutes(15)));
+        verify(accessTokenRevocationStore).revokeJti(eq("jti-123"), eq(Duration.ofMinutes(15)));
+    }
+
+    @Test
+    @DisplayName("logout with invalid refresh still denylists access tokens from Bearer subject")
+    void logout_withUnknownRefresh_revokesAccessFromBearer() {
+        when(refreshTokens.findByTokenHash(any())).thenReturn(Optional.empty());
+
+        service.logout("unknown-refresh", "jti-abc", USER_ID);
+
+        verify(refreshTokens, never()).revokeAllForUser(any());
+        verify(accessTokenRevocationStore).revokeAllIssuedAtOrBefore(
+                eq(USER_ID), any(Instant.class), eq(Duration.ofMinutes(15)));
+        verify(accessTokenRevocationStore).revokeJti(eq("jti-abc"), eq(Duration.ofMinutes(15)));
     }
 }

@@ -10,8 +10,12 @@ import com.snowresorts.auth.domain.port.RefreshTokens;
 import com.snowresorts.auth.domain.port.UserAccounts;
 import com.snowresorts.security.error.ConflictException;
 import com.snowresorts.security.error.UnauthorizedException;
+import com.snowresorts.security.error.TooManyRequestsException;
+import com.snowresorts.security.jwt.AccessTokenRevocationStore;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,60 +33,87 @@ public class AuthenticationService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthenticationService.class);
 
+    private static final String GENERIC_REGISTER_ERROR = "Registration could not be completed.";
+    private static final String GENERIC_LOGIN_ERROR = "Invalid email or password.";
+
     private final UserAccounts userAccounts;
     private final RefreshTokens refreshTokens;
     private final AccessTokenIssuer accessTokenIssuer;
     private final ProfileBootstrap profileBootstrap;
     private final PasswordEncoder passwordEncoder;
+    private final AccessTokenRevocationStore accessTokenRevocationStore;
+    private final AuthRateLimiter rateLimiter;
     private final Duration refreshTokenTtl;
+    private final Duration accessTokenTtl;
+    /** Bcrypt of a fixed string — used only to equalise login timing when the email is unknown. */
+    private final String dummyPasswordHash;
 
     public AuthenticationService(UserAccounts userAccounts,
                                  RefreshTokens refreshTokens,
                                  AccessTokenIssuer accessTokenIssuer,
                                  ProfileBootstrap profileBootstrap,
                                  PasswordEncoder passwordEncoder,
+                                 AccessTokenRevocationStore accessTokenRevocationStore,
+                                 AuthRateLimiter rateLimiter,
                                  AuthTokenProperties properties) {
         this.userAccounts = userAccounts;
         this.refreshTokens = refreshTokens;
         this.accessTokenIssuer = accessTokenIssuer;
         this.profileBootstrap = profileBootstrap;
         this.passwordEncoder = passwordEncoder;
+        this.accessTokenRevocationStore = accessTokenRevocationStore;
+        this.rateLimiter = rateLimiter;
         this.refreshTokenTtl = properties.refreshTokenTtl();
+        this.accessTokenTtl = properties.accessTokenTtl();
+        this.dummyPasswordHash = passwordEncoder.encode("!snow-resorts-timing-dummy!");
     }
 
     /**
-     * Registers a new account and immediately issues a token pair (auto-login), reusing the
-     * same issuance path as {@link #login}. The email is normalized and must be unique.
-     *
-     * @throws ConflictException if an account with the same (normalized) email already exists
+     * Registers a new account and immediately issues a token pair (auto-login).
+     * Conflict messages are intentionally generic to avoid account enumeration.
      */
     @Transactional
     public TokenPair register(String email, String rawPassword, String username, String displayName) {
         String normalizedEmail = normalize(email);
         if (userAccounts.findByEmail(normalizedEmail).isPresent()) {
-            throw new ConflictException("An account with this email already exists.");
+            passwordEncoder.encode(rawPassword);
+            throw new ConflictException(GENERIC_REGISTER_ERROR);
         }
 
-        profileBootstrap.ensureUsernameAvailable(username);
+        try {
+            profileBootstrap.ensureUsernameAvailable(username);
+        } catch (ConflictException ex) {
+            throw new ConflictException(GENERIC_REGISTER_ERROR);
+        }
 
         String passwordHash = passwordEncoder.encode(rawPassword);
         UserAccount account = userAccounts.create(normalizedEmail, passwordHash, true);
         log.info("Registered new account {}", account.id());
-        profileBootstrap.bootstrapProfile(account.id(), account.email(), username, displayName.trim());
+        try {
+            profileBootstrap.bootstrapProfile(account.id(), account.email(), username, displayName.trim());
+        } catch (ConflictException ex) {
+            throw new ConflictException(GENERIC_REGISTER_ERROR);
+        }
         return issueTokens(account);
     }
 
     @Transactional
     public TokenPair login(String email, String rawPassword) {
-        UserAccount account = userAccounts.findByEmail(normalize(email))
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or password."));
-
-        if (!passwordEncoder.matches(rawPassword, account.passwordHash())) {
-            log.info("Failed login attempt for account {}", account.id());
-            throw new UnauthorizedException("Invalid email or password.");
+        String normalizedEmail = normalize(email);
+        // IP limit is enforced by AuthRateLimitFilter; account limit lives here.
+        if (!rateLimiter.tryConsumeAccount(normalizedEmail)) {
+            throw new TooManyRequestsException("Too many authentication attempts. Try again later.");
         }
-        if (!account.enabled()) {
-            throw new UnauthorizedException("Account is disabled.");
+
+        UserAccount account = userAccounts.findByEmail(normalizedEmail).orElse(null);
+        String hashToCheck = account != null ? account.passwordHash() : dummyPasswordHash;
+        boolean passwordMatches = passwordEncoder.matches(rawPassword, hashToCheck);
+
+        if (account == null || !passwordMatches || !account.enabled()) {
+            if (account != null) {
+                log.info("Failed login attempt for account {}", account.id());
+            }
+            throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
         }
 
         log.info("Successful login for account {}", account.id());
@@ -97,10 +128,11 @@ public class AuthenticationService {
 
         Instant now = Instant.now();
         if (stored.revoked()) {
-            // Token reuse after rotation — likely theft. Revoke the whole family.
             log.warn("Detected reuse of a revoked refresh token for account {}; revoking all sessions",
                     stored.userId());
             refreshTokens.revokeAllForUser(stored.userId());
+            accessTokenRevocationStore.revokeAllIssuedAtOrBefore(
+                    stored.userId(), now, accessTokenTtl);
             throw new UnauthorizedException("Invalid refresh token.");
         }
         if (!stored.isActive(now)) {
@@ -114,10 +146,29 @@ public class AuthenticationService {
         return issueTokens(account);
     }
 
+    /**
+     * Revokes the presented refresh-token family and denylists access tokens. Public endpoint —
+     * the refresh token is the primary credential; when it is missing/invalid but a Bearer access
+     * token is presented, that token's subject is still revoked (session kill).
+     */
     @Transactional
-    public void logout(String rawRefreshToken) {
-        refreshTokens.findByTokenHash(RefreshTokenCodec.hash(rawRefreshToken))
-                .ifPresent(token -> refreshTokens.revoke(token.id()));
+    public void logout(String rawRefreshToken, String accessTokenJti, UUID accessTokenUserId) {
+        Instant now = Instant.now();
+        AtomicBoolean refreshRevoked = new AtomicBoolean(false);
+        refreshTokens.findByTokenHash(RefreshTokenCodec.hash(rawRefreshToken)).ifPresent(token -> {
+            refreshTokens.revokeAllForUser(token.userId());
+            accessTokenRevocationStore.revokeAllIssuedAtOrBefore(token.userId(), now, accessTokenTtl);
+            refreshRevoked.set(true);
+            log.info("Logged out account {}; refresh family and access tokens revoked", token.userId());
+        });
+        if (!refreshRevoked.get() && accessTokenUserId != null) {
+            accessTokenRevocationStore.revokeAllIssuedAtOrBefore(accessTokenUserId, now, accessTokenTtl);
+            log.info("Logged out via access token for account {}; refresh was absent/invalid",
+                    accessTokenUserId);
+        }
+        if (accessTokenJti != null && !accessTokenJti.isBlank()) {
+            accessTokenRevocationStore.revokeJti(accessTokenJti, accessTokenTtl);
+        }
     }
 
     private TokenPair issueTokens(UserAccount account) {

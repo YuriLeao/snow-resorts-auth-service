@@ -14,6 +14,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *     refresh-token-ttl: 30d
  *     password-reset-ttl: 1h
  *     key-id: snow-auth-key
+ *     signing-key-pem: ${JWT_SECRET:}
  *     password-reset-base-url: http://localhost:8080/reset-password
  *     user-service-url: http://localhost:8082
  *     internal-api-secret: ${INTERNAL_API_SECRET:dev-internal-secret}
@@ -28,7 +29,8 @@ public record AuthTokenProperties(
         Duration passwordResetTtl,
         String passwordResetBaseUrl,
         String userServiceUrl,
-        String internalApiSecret) {
+        String internalApiSecret,
+        String signingKeyPem) {
 
     public AuthTokenProperties {
         if (issuer == null || issuer.isBlank()) {
@@ -54,6 +56,9 @@ public record AuthTokenProperties(
         }
         if (internalApiSecret == null || internalApiSecret.isBlank()) {
             internalApiSecret = "dev-internal-secret";
+        }
+        if (signingKeyPem != null && signingKeyPem.isBlank()) {
+            signingKeyPem = null;
         }
     }
 }

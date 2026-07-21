@@ -16,6 +16,7 @@ import com.snowresorts.auth.domain.port.PasswordResetTokens;
 import com.snowresorts.auth.domain.port.RefreshTokens;
 import com.snowresorts.auth.domain.port.UserAccounts;
 import com.snowresorts.security.error.BadRequestException;
+import com.snowresorts.security.jwt.AccessTokenRevocationStore;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -44,6 +45,8 @@ class PasswordResetServiceTest {
     private RefreshTokens refreshTokens;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private AccessTokenRevocationStore accessTokenRevocationStore;
 
     private PasswordResetService service;
 
@@ -51,9 +54,9 @@ class PasswordResetServiceTest {
     void setUp() {
         AuthTokenProperties props = new AuthTokenProperties(
                 "https://auth.test", Duration.ofMinutes(15), Duration.ofDays(30), "k1", Duration.ofHours(1),
-                null, null, null);
+                null, null, null, null);
         service = new PasswordResetService(userAccounts, passwordResetTokens, notifier,
-                refreshTokens, passwordEncoder, props);
+                refreshTokens, passwordEncoder, accessTokenRevocationStore, props);
     }
 
     private UserAccount account() {

@@ -34,6 +34,10 @@ spring:
           auth: false
           starttls:
             enable: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 server:
   port: ${SERVER_PORT:8081}
@@ -46,6 +50,8 @@ snow:
     refresh-token-ttl: 30d
     password-reset-ttl: 1h
     key-id: snow-auth-key
+    # PKCS#8 PEM private key. Local/test generate an ephemeral key when unset.
+    signing-key-pem: ${JWT_SECRET:}
     # Base URL for the reset link in e-mails. Local: http://localhost:8080/reset-password (nginx → app deep link).
     # Override via PASSWORD_RESET_BASE_URL (e.g. http://<LAN_IP>:8080/reset-password on a physical phone).
     password-reset-base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:8080/reset-password}
@@ -54,6 +60,9 @@ snow:
   # auth-service issues tokens; it does not run the shared resource-server chain.
   security:
     enabled: false
+    cors:
+      allowed-origins:
+        - ${CORS_ALLOWED_ORIGIN:http://localhost:8080}
 
 management:
   endpoints:
