@@ -15,8 +15,10 @@ target/
 # OS
 .DS_Store
 
-# Local secrets / env
-*.env
-.env.local
 settings.xml
 pom.xml.versionsBackup
+
+# Local secrets / env
+.env
+.env.*
+!.env*.example
