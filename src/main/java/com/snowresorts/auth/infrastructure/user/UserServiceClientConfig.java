@@ -9,8 +9,8 @@ import org.springframework.web.client.RestClient;
 public class UserServiceClientConfig {
 
     @Bean
-    RestClient userServiceRestClient(AuthTokenProperties properties) {
-        return RestClient.builder()
+    RestClient userServiceRestClient(RestClient.Builder restClientBuilder, AuthTokenProperties properties) {
+        return restClientBuilder
                 .baseUrl(properties.userServiceUrl())
                 .build();
     }

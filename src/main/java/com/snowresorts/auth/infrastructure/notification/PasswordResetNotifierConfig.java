@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.util.StringUtils;
 
@@ -14,8 +15,9 @@ import org.springframework.util.StringUtils;
 public class PasswordResetNotifierConfig {
 
     /**
-     * Picks SMTP delivery when {@code spring.mail.host} is set and {@link JavaMailSender} is available;
-     * otherwise falls back to logging the raw token (local dev without Mailpit).
+     * Picks SMTP delivery when {@code spring.mail.host} is set and {@link JavaMailSender} is available.
+     * Outside {@code local}/{@code test}, missing SMTP host fails fast. Logging fallback is only for
+     * local/test without Mailpit.
      */
     @Bean
     PasswordResetNotifier passwordResetNotifier(ObjectProvider<JavaMailSender> mailSender,
@@ -28,6 +30,10 @@ public class PasswordResetNotifierConfig {
             if (sender != null) {
                 return new SmtpPasswordResetNotifier(sender, properties, from);
             }
+        }
+        boolean localOrTest = environment.acceptsProfiles(Profiles.of("local", "test"));
+        if (!localOrTest) {
+            throw new IllegalStateException("spring.mail.host is required outside local/test");
         }
         return new LoggingPasswordResetNotifier();
     }

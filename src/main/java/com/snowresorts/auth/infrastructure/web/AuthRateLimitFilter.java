@@ -1,11 +1,14 @@
 package com.snowresorts.auth.infrastructure.web;
 
 import com.snowresorts.auth.application.AuthRateLimiter;
+import com.snowresorts.security.logging.StructuredLogger;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -20,6 +23,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class AuthRateLimitFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthRateLimitFilter.class);
 
     private final AuthRateLimiter rateLimiter;
 
@@ -45,6 +50,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String ip = ClientIpResolver.resolve(request);
         if (!rateLimiter.tryConsumeIp(ip)) {
+            StructuredLogger.of(log).warn("auth_rate_limit", "denied", "ip_limit_exceeded",
+                    "path", request.getRequestURI());
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
             response.getWriter().write(

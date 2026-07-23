@@ -13,6 +13,8 @@ spring:
     username: noreply@snow-resorts.local
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [%X{request_id}] %logger{36} - %msg%n"
   level:
     com.snowresorts.auth: DEBUG
 

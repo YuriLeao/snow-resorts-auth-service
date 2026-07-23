@@ -7,6 +7,7 @@ import com.snowresorts.auth.domain.port.RefreshTokens;
 import com.snowresorts.auth.domain.port.UserAccounts;
 import com.snowresorts.security.error.BadRequestException;
 import com.snowresorts.security.jwt.AccessTokenRevocationStore;
+import com.snowresorts.security.logging.StructuredLogger;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -63,8 +64,9 @@ public class PasswordResetService {
             passwordResetTokens.save(account.id(), RefreshTokenCodec.hash(rawToken),
                     Instant.now().plus(passwordResetTtl));
             notifier.sendPasswordReset(account.email(), rawToken);
-            log.info("Issued password reset token for account {}", account.id());
-        }, () -> log.info("Password reset requested for an unknown email; responding without action"));
+            StructuredLogger.of(log).info("password_reset_request", "succeeded", "issued",
+                    "user_id", account.id());
+        }, () -> StructuredLogger.of(log).info("password_reset_request", "accepted", "unknown_email"));
     }
 
     /**
@@ -84,7 +86,8 @@ public class PasswordResetService {
         passwordResetTokens.markUsed(token.id());
         refreshTokens.revokeAllForUser(token.userId());
         accessTokenRevocationStore.revokeAllIssuedAtOrBefore(token.userId(), now, accessTokenTtl);
-        log.info("Password reset completed for account {}; all sessions revoked", token.userId());
+        StructuredLogger.of(log).info("password_reset", "succeeded", "sessions_revoked",
+                "user_id", token.userId());
     }
 
     private String normalize(String email) {

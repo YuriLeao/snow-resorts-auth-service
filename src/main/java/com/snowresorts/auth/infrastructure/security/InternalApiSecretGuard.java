@@ -1,6 +1,7 @@
 package com.snowresorts.auth.infrastructure.security;
 
 import com.snowresorts.auth.application.AuthTokenProperties;
+import com.snowresorts.security.logging.StructuredLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -32,7 +33,7 @@ public class InternalApiSecretGuard implements ApplicationRunner {
                     "INTERNAL_API_SECRET must be set to a strong value outside local/test profiles");
         }
         if (localOrTest && DEFAULT_SECRET.equals(properties.internalApiSecret())) {
-            log.warn("Using default INTERNAL_API_SECRET — acceptable only for local/test");
+            StructuredLogger.of(log).warn("internal_api_secret", "accepted", "default_secret");
         }
     }
 }

@@ -2,6 +2,7 @@ package com.snowresorts.auth.infrastructure.dev;
 
 import com.snowresorts.auth.infrastructure.persistence.UserAccountEntity;
 import com.snowresorts.auth.infrastructure.persistence.UserAccountJpaRepository;
+import com.snowresorts.security.logging.StructuredLogger;
 import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -46,6 +47,7 @@ public class LocalDevDemoUserSeeder implements ApplicationRunner {
                 passwordEncoder.encode(DEMO_PASSWORD),
                 true,
                 Instant.now()));
-        log.info("Seeded local demo user {} (password documented in infra README)", DEMO_EMAIL);
+        StructuredLogger.of(log).info("demo_user_seed", "succeeded", "created",
+                "user_id", DEMO_USER_ID);
     }
 }

@@ -4,6 +4,7 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.snowresorts.auth.application.AuthTokenProperties;
+import com.snowresorts.security.logging.StructuredLogger;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.interfaces.RSAPrivateKey;
@@ -34,7 +35,8 @@ public class RsaKeyProvider {
         String pem = properties.signingKeyPem();
         if (pem != null && looksLikePem(pem)) {
             this.rsaKey = loadFromPem(pem, properties.keyId());
-            log.info("Loaded RSA signing key from snow.auth.signing-key-pem (kid={})", properties.keyId());
+            StructuredLogger.of(log).info("rsa_key_load", "succeeded", "pem",
+                    "kid", properties.keyId());
             return;
         }
         boolean allowEphemeral = environment.acceptsProfiles(Profiles.of("local", "test"));
@@ -47,8 +49,8 @@ public class RsaKeyProvider {
             this.rsaKey = new RSAKeyGenerator(2048)
                     .keyID(properties.keyId())
                     .generate();
-            log.warn("Generated ephemeral RSA signing key for profile local/test (kid={})",
-                    properties.keyId());
+            StructuredLogger.of(log).warn("rsa_key_load", "accepted", "ephemeral",
+                    "kid", properties.keyId());
         } catch (JOSEException e) {
             throw new IllegalStateException("Failed to generate RSA signing key", e);
         }

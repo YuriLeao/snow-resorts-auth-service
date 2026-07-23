@@ -12,6 +12,7 @@ import com.snowresorts.security.error.ConflictException;
 import com.snowresorts.security.error.UnauthorizedException;
 import com.snowresorts.security.error.TooManyRequestsException;
 import com.snowresorts.security.jwt.AccessTokenRevocationStore;
+import com.snowresorts.security.logging.StructuredLogger;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -88,7 +89,8 @@ public class AuthenticationService {
 
         String passwordHash = passwordEncoder.encode(rawPassword);
         UserAccount account = userAccounts.create(normalizedEmail, passwordHash, true);
-        log.info("Registered new account {}", account.id());
+        StructuredLogger.of(log).info("register", "succeeded", "account_created",
+                "user_id", account.id());
         try {
             profileBootstrap.bootstrapProfile(account.id(), account.email(), username, displayName.trim());
         } catch (ConflictException ex) {
@@ -111,12 +113,13 @@ public class AuthenticationService {
 
         if (account == null || !passwordMatches || !account.enabled()) {
             if (account != null) {
-                log.info("Failed login attempt for account {}", account.id());
+                StructuredLogger.of(log).info("login", "denied", "invalid_credentials",
+                        "user_id", account.id());
             }
             throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
         }
 
-        log.info("Successful login for account {}", account.id());
+        StructuredLogger.of(log).info("login", "succeeded", "ok", "user_id", account.id());
         return issueTokens(account);
     }
 
@@ -128,8 +131,8 @@ public class AuthenticationService {
 
         Instant now = Instant.now();
         if (stored.revoked()) {
-            log.warn("Detected reuse of a revoked refresh token for account {}; revoking all sessions",
-                    stored.userId());
+            StructuredLogger.of(log).warn("refresh", "denied", "token_reuse",
+                    "user_id", stored.userId());
             refreshTokens.revokeAllForUser(stored.userId());
             accessTokenRevocationStore.revokeAllIssuedAtOrBefore(
                     stored.userId(), now, accessTokenTtl);
@@ -159,12 +162,13 @@ public class AuthenticationService {
             refreshTokens.revokeAllForUser(token.userId());
             accessTokenRevocationStore.revokeAllIssuedAtOrBefore(token.userId(), now, accessTokenTtl);
             refreshRevoked.set(true);
-            log.info("Logged out account {}; refresh family and access tokens revoked", token.userId());
+            StructuredLogger.of(log).info("logout", "succeeded", "refresh_revoked",
+                    "user_id", token.userId());
         });
         if (!refreshRevoked.get() && accessTokenUserId != null) {
             accessTokenRevocationStore.revokeAllIssuedAtOrBefore(accessTokenUserId, now, accessTokenTtl);
-            log.info("Logged out via access token for account {}; refresh was absent/invalid",
-                    accessTokenUserId);
+            StructuredLogger.of(log).info("logout", "succeeded", "access_revoked",
+                    "user_id", accessTokenUserId);
         }
         if (accessTokenJti != null && !accessTokenJti.isBlank()) {
             accessTokenRevocationStore.revokeJti(accessTokenJti, accessTokenTtl);

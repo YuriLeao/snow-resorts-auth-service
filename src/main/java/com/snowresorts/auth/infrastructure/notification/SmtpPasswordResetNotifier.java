@@ -2,6 +2,7 @@ package com.snowresorts.auth.infrastructure.notification;
 
 import com.snowresorts.auth.application.AuthTokenProperties;
 import com.snowresorts.auth.domain.port.PasswordResetNotifier;
+import com.snowresorts.security.logging.StructuredLogger;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
@@ -56,10 +57,9 @@ public class SmtpPasswordResetNotifier implements PasswordResetNotifier {
             helper.addInline("appIcon", new ClassPathResource("email/app-icon.png"));
             helper.setText(plainText, htmlText);
             mailSender.send(mimeMessage);
-            log.info("Password reset email sent to {}", email);
+            StructuredLogger.of(log).info("password_reset_email", "succeeded", "sent");
         } catch (MailException | MessagingException ex) {
-            log.error("Failed to send password reset email to {} — token was issued but not delivered",
-                    email, ex);
+            StructuredLogger.of(log).error("password_reset_email", "failed", "smtp_error", ex);
         }
     }
 

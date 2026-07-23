@@ -4,6 +4,7 @@ import com.snowresorts.auth.application.AuthTokenProperties;
 import com.snowresorts.auth.domain.port.ProfileBootstrap;
 import com.snowresorts.security.error.BadRequestException;
 import com.snowresorts.security.error.ConflictException;
+import com.snowresorts.security.logging.StructuredLogger;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,7 @@ public class RestProfileBootstrapClient implements ProfileBootstrap {
         } catch (RestClientResponseException ex) {
             throw mapUsernameCheckFailure(ex);
         } catch (RestClientException ex) {
-            log.error("Failed to verify username availability", ex);
+            StructuredLogger.of(log).error("username_check", "failed", "rest_client_error", ex);
             throw new BadRequestException("Could not verify username availability.");
         }
     }
@@ -54,16 +55,18 @@ public class RestProfileBootstrapClient implements ProfileBootstrap {
                     .body(new BootstrapProfileRequest(userId, email, username, displayName))
                     .retrieve()
                     .toBodilessEntity();
-            log.info("Bootstrapped profile for account {}", userId);
+            StructuredLogger.of(log).info("profile_bootstrap", "succeeded", "ok",
+                    "user_id", userId);
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().value() == 409) {
                 throw new ConflictException("That username is already taken.");
             }
-            log.error("Failed to bootstrap profile for account {} — registration succeeded but GET /profile "
-                    + "may return 404 until a profile is created manually", userId, ex);
+            StructuredLogger.of(log).error("profile_bootstrap", "failed", "http_error", ex,
+                    "user_id", userId,
+                    "status", ex.getStatusCode().value());
         } catch (RestClientException ex) {
-            log.error("Failed to bootstrap profile for account {} — registration succeeded but GET /profile "
-                    + "may return 404 until a profile is created manually", userId, ex);
+            StructuredLogger.of(log).error("profile_bootstrap", "failed", "rest_client_error", ex,
+                    "user_id", userId);
         }
     }
 
@@ -72,7 +75,8 @@ public class RestProfileBootstrapClient implements ProfileBootstrap {
             case 409 -> new ConflictException("That username is already taken.");
             case 400 -> new BadRequestException("username must be 3-20 characters and contain only letters, numbers and underscores.");
             default -> {
-                log.error("Unexpected response checking username availability: HTTP {}", ex.getStatusCode().value(), ex);
+                StructuredLogger.of(log).error("username_check", "failed", "unexpected_status", ex,
+                        "status", ex.getStatusCode().value());
                 yield new BadRequestException("Could not verify username availability.");
             }
         };
