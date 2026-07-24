@@ -33,7 +33,7 @@ public class InternalApiSecretGuard implements ApplicationRunner {
                     "INTERNAL_API_SECRET must be set to a strong value outside local/test profiles");
         }
         if (localOrTest && DEFAULT_SECRET.equals(properties.internalApiSecret())) {
-            StructuredLogger.of(log).warn("internal_api_secret", "accepted", "default_secret");
+            StructuredLogger.of(log).debug("internal_api_secret", "accepted", "default_secret");
         }
     }
 }

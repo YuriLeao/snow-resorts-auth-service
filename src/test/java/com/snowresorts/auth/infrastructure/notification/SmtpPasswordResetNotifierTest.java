@@ -31,14 +31,14 @@ class SmtpPasswordResetNotifierTest {
     void setUp() {
         AuthTokenProperties properties = new AuthTokenProperties(
                 "https://auth.test",
+                "snow-resorts-api",
                 Duration.ofMinutes(15),
                 Duration.ofDays(30),
                 "k1",
                 Duration.ofHours(1),
                 "http://localhost:8080/reset-password",
                 "http://localhost:8082",
-                "dev-internal-secret",
-                null);
+                "dev-internal-secret", null, null, null);
         notifier = new SmtpPasswordResetNotifier(mailSender, properties, "noreply@snow-resorts.local");
     }
 
@@ -76,14 +76,14 @@ class SmtpPasswordResetNotifierTest {
     void buildResetLink_withExistingQueryParams_appendsToken() {
         AuthTokenProperties properties = new AuthTokenProperties(
                 "https://auth.test",
+                "snow-resorts-api",
                 Duration.ofMinutes(15),
                 Duration.ofDays(30),
                 "k1",
                 Duration.ofHours(1),
                 "http://app/reset?lang=en",
                 "http://localhost:8082",
-                "dev-internal-secret",
-                null);
+                "dev-internal-secret", null, null, null);
         SmtpPasswordResetNotifier customNotifier =
                 new SmtpPasswordResetNotifier(mailSender, properties, "noreply@snow-resorts.local");
 

@@ -46,14 +46,14 @@ class RestProfileBootstrapClientTest {
     void setUp() {
         AuthTokenProperties properties = new AuthTokenProperties(
                 "https://auth.test",
+                "snow-resorts-api",
                 Duration.ofMinutes(15),
                 Duration.ofDays(30),
                 "k1",
                 Duration.ofHours(1),
                 null,
                 "http://localhost:8082",
-                "test-secret",
-                null);
+                "test-secret", null, null, null);
         client = new RestProfileBootstrapClient(restClient, properties);
     }
 

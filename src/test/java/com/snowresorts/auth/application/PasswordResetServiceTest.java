@@ -53,8 +53,9 @@ class PasswordResetServiceTest {
     @BeforeEach
     void setUp() {
         AuthTokenProperties props = new AuthTokenProperties(
-                "https://auth.test", Duration.ofMinutes(15), Duration.ofDays(30), "k1", Duration.ofHours(1),
-                null, null, null, null);
+                "https://auth.test", "snow-resorts-api",
+                Duration.ofMinutes(15), Duration.ofDays(30), "k1", Duration.ofHours(1),
+                null, null, null, null, null, null);
         service = new PasswordResetService(userAccounts, passwordResetTokens, notifier,
                 refreshTokens, passwordEncoder, accessTokenRevocationStore, props);
     }
@@ -76,6 +77,7 @@ class PasswordResetServiceTest {
         // Assert
         ArgumentCaptor<String> hashCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> rawCaptor = ArgumentCaptor.forClass(String.class);
+        verify(passwordResetTokens).invalidateUnusedForUser(USER_ID);
         verify(passwordResetTokens).save(eq(USER_ID), hashCaptor.capture(), any(Instant.class));
         verify(notifier).sendPasswordReset(eq("rider@snow-resorts.com"), rawCaptor.capture());
         // The persisted value is the hash of the raw token handed to the delivery port, never the raw token.

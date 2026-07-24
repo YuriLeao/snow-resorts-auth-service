@@ -36,6 +36,11 @@ public class PasswordResetTokenRepositoryAdapter implements PasswordResetTokens 
         });
     }
 
+    @Override
+    public void invalidateUnusedForUser(UUID userId) {
+        jpaRepository.invalidateUnusedForUser(userId);
+    }
+
     private PasswordResetToken toDomain(PasswordResetTokenEntity entity) {
         return new PasswordResetToken(entity.getId(), entity.getUserId(), entity.getTokenHash(),
                 entity.getExpiresAt(), entity.isUsed(), entity.getCreatedAt());

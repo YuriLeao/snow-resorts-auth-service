@@ -60,6 +60,7 @@ public class PasswordResetService {
     @Transactional
     public void requestReset(String email) {
         userAccounts.findByEmail(normalize(email)).ifPresentOrElse(account -> {
+            passwordResetTokens.invalidateUnusedForUser(account.id());
             String rawToken = RefreshTokenCodec.newRawToken();
             passwordResetTokens.save(account.id(), RefreshTokenCodec.hash(rawToken),
                     Instant.now().plus(passwordResetTtl));

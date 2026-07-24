@@ -3,14 +3,14 @@ package com.snowresorts.auth.infrastructure.web;
 import com.snowresorts.auth.application.AuthenticationService;
 import com.snowresorts.auth.application.PasswordResetService;
 import com.snowresorts.auth.domain.model.TokenPair;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.text.ParseException;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,11 +23,14 @@ public class AuthController {
 
     private final AuthenticationService authenticationService;
     private final PasswordResetService passwordResetService;
+    private final JwtDecoder jwtDecoder;
 
     public AuthController(AuthenticationService authenticationService,
-                         PasswordResetService passwordResetService) {
+                         PasswordResetService passwordResetService,
+                         JwtDecoder jwtDecoder) {
         this.authenticationService = authenticationService;
         this.passwordResetService = passwordResetService;
+        this.jwtDecoder = jwtDecoder;
     }
 
     @PostMapping("/register")
@@ -69,7 +72,11 @@ public class AuthController {
         passwordResetService.resetPassword(request.token(), request.newPassword());
     }
 
-    private static AccessTokenHints extractAccessTokenHints(HttpServletRequest request) {
+    /**
+     * Only claims from a signature-verified JWT are used for access-token revocation hints.
+     * Forged / unsigned tokens are ignored (logout still proceeds via refresh token).
+     */
+    private AccessTokenHints extractAccessTokenHints(HttpServletRequest request) {
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             return AccessTokenHints.none();
@@ -79,17 +86,18 @@ public class AuthController {
             return AccessTokenHints.none();
         }
         try {
-            JWTClaimsSet claims = SignedJWT.parse(token).getJWTClaimsSet();
+            Jwt jwt = jwtDecoder.decode(token);
             UUID userId = null;
-            if (claims.getSubject() != null) {
+            String sub = jwt.getSubject();
+            if (sub != null) {
                 try {
-                    userId = UUID.fromString(claims.getSubject());
+                    userId = UUID.fromString(sub);
                 } catch (IllegalArgumentException ignored) {
                     // ignore malformed sub
                 }
             }
-            return new AccessTokenHints(claims.getJWTID(), userId);
-        } catch (ParseException ex) {
+            return new AccessTokenHints(jwt.getId(), userId);
+        } catch (JwtException ex) {
             return AccessTokenHints.none();
         }
     }

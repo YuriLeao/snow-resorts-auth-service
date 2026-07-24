@@ -47,8 +47,27 @@ jobs:
             target/failsafe-reports/**
           if-no-files-found: ignore
 
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trivy filesystem
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
   deploy:
-    needs: build-test
+    needs: [build-test, security]
     # Deploy only on pushes to staging/master (staging -> staging env, master -> prod env).
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

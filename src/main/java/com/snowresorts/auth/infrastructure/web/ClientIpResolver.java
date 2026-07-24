@@ -2,21 +2,21 @@ package com.snowresorts.auth.infrastructure.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+/**
+ * Resolves the client IP for rate limiting from {@code remoteAddr} only.
+ * Does not trust {@code X-Forwarded-For} / {@code X-Real-IP} (spoofable by clients);
+ * nginx strips inbound XFF so the peer address is the edge hop.
+ */
 final class ClientIpResolver {
 
     private ClientIpResolver() {
     }
 
     static String resolve(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            int comma = forwarded.indexOf(',');
-            return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
+        String remote = request.getRemoteAddr();
+        if (remote != null && !remote.isBlank()) {
+            return remote.trim();
         }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
-        }
-        return request.getRemoteAddr();
+        return "unknown";
     }
 }

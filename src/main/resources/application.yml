@@ -38,6 +38,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # Template-only Redis usage; avoid Spring Data Redis scanning JPA repos.
+      repositories:
+        enabled: false
 
 server:
   port: ${SERVER_PORT:8081}
@@ -46,12 +49,16 @@ server:
 snow:
   auth:
     issuer: ${JWT_ISSUER:https://auth.snow-resorts.local}
+    audience: ${JWT_AUDIENCE:snow-resorts-api}
     access-token-ttl: 15m
     refresh-token-ttl: 30d
     password-reset-ttl: 1h
     key-id: snow-auth-key
-    # PKCS#8 PEM private key. Local/test generate an ephemeral key when unset.
+    # PKCS#8 PEM or dual-key JSON {currentPem,currentKid,previousPem,previousKid}.
+    # Local/test generate an ephemeral key when unset.
     signing-key-pem: ${JWT_SECRET:}
+    previous-signing-key-pem: ${JWT_PREVIOUS_SECRET:}
+    previous-key-id: ${JWT_PREVIOUS_KEY_ID:snow-auth-key-previous}
     # Base URL for the reset link in e-mails. Local: http://localhost:8080/reset-password (nginx → app deep link).
     # Override via PASSWORD_RESET_BASE_URL (e.g. http://<LAN_IP>:8080/reset-password on a physical phone).
     password-reset-base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:8080/reset-password}

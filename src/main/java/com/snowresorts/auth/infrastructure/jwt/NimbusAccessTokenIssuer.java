@@ -36,6 +36,7 @@ public class NimbusAccessTokenIssuer implements AccessTokenIssuer {
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(properties.issuer())
+                .audience(List.of(properties.audience()))
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(ttlSeconds))
                 .subject(account.id().toString())

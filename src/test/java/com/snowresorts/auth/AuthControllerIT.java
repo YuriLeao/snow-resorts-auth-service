@@ -5,9 +5,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import com.snowresorts.auth.application.RefreshTokenCodec;
+import com.snowresorts.auth.domain.port.ProfileBootstrap;
 import com.snowresorts.auth.infrastructure.persistence.PasswordResetTokenEntity;
 import com.snowresorts.auth.infrastructure.persistence.PasswordResetTokenJpaRepository;
 import com.snowresorts.auth.infrastructure.persistence.UserAccountEntity;
@@ -19,13 +20,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -60,7 +62,11 @@ class AuthControllerIT {
     @Autowired
     private PasswordResetTokenJpaRepository passwordResetTokens;
     @Autowired
-    private ObjectMapper objectMapper;
+    private JsonMapper objectMapper;
+
+    /** User-service is not running in this IT; registration only needs auth DB + tokens. */
+    @MockitoBean
+    private ProfileBootstrap profileBootstrap;
 
     private UUID seededUserId;
 
@@ -130,7 +136,7 @@ class AuthControllerIT {
         mockMvc.perform(post("/snow-resort-service/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"NewRider@snow-resorts.com","password":"Password123!"}"""))
+                                {"email":"NewRider@snow-resorts.com","password":"Password123!","username":"newrider","displayName":"New Rider"}"""))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken", notNullValue()))
                 .andExpect(jsonPath("$.refreshToken", notNullValue()))
@@ -150,7 +156,7 @@ class AuthControllerIT {
         mockMvc.perform(post("/snow-resort-service/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"Rider@snow-resorts.com","password":"Password123!"}"""))
+                                {"email":"Rider@snow-resorts.com","password":"Password123!","username":"riderdup","displayName":"Rider"}"""))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Conflict"));
     }

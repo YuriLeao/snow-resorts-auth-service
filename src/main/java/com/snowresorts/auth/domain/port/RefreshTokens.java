@@ -12,7 +12,12 @@ public interface RefreshTokens {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-    void revoke(UUID tokenId);
+    /**
+     * Atomically marks the token revoked only if it is still active.
+     *
+     * @return {@code true} if a row was updated; {@code false} if already revoked/missing (reuse)
+     */
+    boolean revokeIfActive(UUID tokenId);
 
     void revokeAllForUser(UUID userId);
 }

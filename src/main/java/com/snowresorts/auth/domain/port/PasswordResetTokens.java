@@ -13,4 +13,7 @@ public interface PasswordResetTokens {
     Optional<PasswordResetToken> findByTokenHash(String tokenHash);
 
     void markUsed(UUID tokenId);
+
+    /** Marks all unused reset tokens for the user as used (invalidate prior links). */
+    void invalidateUnusedForUser(UUID userId);
 }

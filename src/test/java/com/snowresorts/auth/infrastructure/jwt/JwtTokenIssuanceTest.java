@@ -33,9 +33,9 @@ class JwtTokenIssuanceTest {
 
     @BeforeEach
     void setUp() {
-        properties = new AuthTokenProperties("https://auth.test",
+        properties = new AuthTokenProperties("https://auth.test", "snow-resorts-api",
                 Duration.ofMinutes(15), Duration.ofDays(30), "test-key", Duration.ofHours(1),
-                null, null, null, null);
+                null, null, null, null, null, null);
         MockEnvironment env = new MockEnvironment();
         env.setActiveProfiles("test");
         keyProvider = new RsaKeyProvider(properties, env);
@@ -53,7 +53,7 @@ class JwtTokenIssuanceTest {
         // Act
         IssuedAccessToken token = issuer.issue(account);
 
-        RSAPublicKey publicKey = keyProvider.publicKey().toRSAPublicKey();
+        RSAPublicKey publicKey = keyProvider.verificationKeys().getFirst().toRSAPublicKey();
         JwtDecoder decoder = NimbusJwtDecoder.withPublicKey(publicKey)
                 .signatureAlgorithm(SignatureAlgorithm.RS256)
                 .build();
@@ -63,6 +63,7 @@ class JwtTokenIssuanceTest {
         assertThat(token.expiresInSeconds()).isEqualTo(900);
         assertThat(decoded.getSubject()).isEqualTo(USER_ID.toString());
         assertThat(decoded.getIssuer()).hasToString("https://auth.test");
+        assertThat(decoded.getAudience()).containsExactly("snow-resorts-api");
         assertThat(decoded.hasClaim("email")).isFalse();
         assertThat((List<String>) decoded.getClaim("roles")).contains("USER");
         assertThat(decoded.getExpiresAt()).isNotNull();
@@ -70,8 +71,9 @@ class JwtTokenIssuanceTest {
 
     @Test
     @DisplayName("published JWKS exposes only public key material (no private exponent)")
-    void publicKey_doesNotExposePrivateMaterial() {
-        assertThat(keyProvider.publicKey().isPrivate()).isFalse();
-        assertThat(keyProvider.publicKey().getKeyID()).isEqualTo("test-key");
+    void verificationKeys_doNotExposePrivateMaterial() {
+        assertThat(keyProvider.verificationKeys()).hasSize(1);
+        assertThat(keyProvider.verificationKeys().getFirst().isPrivate()).isFalse();
+        assertThat(keyProvider.verificationKeys().getFirst().getKeyID()).isEqualTo("test-key");
     }
 }

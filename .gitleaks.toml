@@ -1,0 +1,14 @@
+title = "snow-resorts-auth-service"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build outputs and PEM armor string parsers (not real keys)"
+paths = [
+  '''(^|/)target/''',
+]
+regexes = [
+  '''-----BEGIN ''',
+  '''-----END ''',
+]

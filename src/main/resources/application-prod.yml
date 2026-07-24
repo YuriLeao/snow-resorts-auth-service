@@ -7,3 +7,9 @@ logging:
         service: ${spring.application.name:auth-service}
   level:
     root: INFO
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -131,22 +131,26 @@ public class AuthenticationService {
 
         Instant now = Instant.now();
         if (stored.revoked()) {
-            StructuredLogger.of(log).warn("refresh", "denied", "token_reuse",
-                    "user_id", stored.userId());
-            refreshTokens.revokeAllForUser(stored.userId());
-            accessTokenRevocationStore.revokeAllIssuedAtOrBefore(
-                    stored.userId(), now, accessTokenTtl);
-            throw new UnauthorizedException("Invalid refresh token.");
+            denyRefreshReuse(stored.userId(), now);
         }
         if (!stored.isActive(now)) {
             throw new UnauthorizedException("Refresh token has expired.");
+        }
+        if (!refreshTokens.revokeIfActive(stored.id())) {
+            denyRefreshReuse(stored.userId(), now);
         }
 
         UserAccount account = userAccounts.findById(stored.userId())
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token."));
 
-        refreshTokens.revoke(stored.id());
         return issueTokens(account);
+    }
+
+    private void denyRefreshReuse(UUID userId, Instant now) {
+        StructuredLogger.of(log).warn("refresh", "denied", "token_reuse", "user_id", userId);
+        refreshTokens.revokeAllForUser(userId);
+        accessTokenRevocationStore.revokeAllIssuedAtOrBefore(userId, now, accessTokenTtl);
+        throw new UnauthorizedException("Invalid refresh token.");
     }
 
     /**

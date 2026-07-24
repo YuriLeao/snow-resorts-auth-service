@@ -59,8 +59,9 @@ class AuthenticationServiceTest {
     @BeforeEach
     void setUp() {
         AuthTokenProperties props = new AuthTokenProperties(
-                "https://auth.test", Duration.ofMinutes(15), Duration.ofDays(30), "k1", Duration.ofHours(1),
-                null, null, null, null);
+                "https://auth.test", "snow-resorts-api",
+                Duration.ofMinutes(15), Duration.ofDays(30), "k1", Duration.ofHours(1),
+                null, null, null, null, null, null);
         lenient().when(passwordEncoder.encode(any())).thenReturn("dummy-hash");
         lenient().when(rateLimiter.tryConsumeAccount(any())).thenReturn(true);
         service = new AuthenticationService(userAccounts, refreshTokens, accessTokenIssuer,
@@ -194,6 +195,7 @@ class AuthenticationServiceTest {
         RefreshToken active = new RefreshToken(tokenId, USER_ID, hash,
                 Instant.now().plus(Duration.ofDays(1)), false, Instant.now());
         when(refreshTokens.findByTokenHash(hash)).thenReturn(Optional.of(active));
+        when(refreshTokens.revokeIfActive(tokenId)).thenReturn(true);
         when(userAccounts.findById(USER_ID)).thenReturn(Optional.of(enabledAccount()));
         when(accessTokenIssuer.issue(any())).thenReturn(new IssuedAccessToken("new.access", 900));
 
@@ -203,7 +205,7 @@ class AuthenticationServiceTest {
         // Assert
         assertThat(pair.accessToken()).isEqualTo("new.access");
         assertThat(pair.refreshToken()).isNotBlank().isNotEqualTo(rawToken);
-        verify(refreshTokens).revoke(tokenId);
+        verify(refreshTokens).revokeIfActive(tokenId);
         verify(refreshTokens).save(eq(USER_ID), any(), any());
     }
 

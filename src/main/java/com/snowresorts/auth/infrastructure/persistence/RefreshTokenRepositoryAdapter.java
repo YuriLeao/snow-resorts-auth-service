@@ -29,11 +29,8 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokens {
     }
 
     @Override
-    public void revoke(UUID tokenId) {
-        jpaRepository.findById(tokenId).ifPresent(entity -> {
-            entity.setRevoked(true);
-            jpaRepository.save(entity);
-        });
+    public boolean revokeIfActive(UUID tokenId) {
+        return jpaRepository.revokeIfActive(tokenId) > 0;
     }
 
     @Override
