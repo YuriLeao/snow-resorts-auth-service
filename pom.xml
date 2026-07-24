@@ -23,7 +23,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <snow-resorts-shared.version>1.0.0</snow-resorts-shared.version>
         <springdoc.version>3.0.3</springdoc.version>
-        <dependency-check.version>12.1.0</dependency-check.version>
+        <dependency-check.version>12.2.2</dependency-check.version>
         <!-- Set -DskipITs=true to skip the Testcontainers integration tests (e.g. no Docker). -->
         <skipITs>false</skipITs>
     </properties>
